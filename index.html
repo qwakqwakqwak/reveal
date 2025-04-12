@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Gender Reveal with Reaction</title>
+  <style>
+    html, body, #root {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: black;
+      color: white;
+      font-family: "Helvetica Neue", sans-serif;
+    }
+    .App {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      flex-direction: column;
+      animation: fadeIn 1s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .button-group button {
+      margin: 10px;
+      padding: 10px 25px;
+      background: transparent;
+      border: 1px solid white;
+      border-radius: 12px;
+      color: white;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .button-group button:hover {
+      background: white;
+      color: black;
+    }
+    .reveal {
+      background: #ffc0cb;
+      color: white;
+      font-size: 2.5rem;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    video.fullscreen {
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    function App() {
+      const [step, setStep] = useState(0);
+      const [shouldRecord, setShouldRecord] = useState(false);
+      const recorderRef = useRef();
+      const streamRef = useRef();
+
+      const startRecording = async () => {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user" },
+          audio: true
+        });
+        streamRef.current = stream;
+
+        const recorder = new MediaRecorder(stream);
+        const chunks = [];
+
+        recorder.ondataavailable = e => chunks.push(e.data);
+        recorder.onstop = () => {
+          const blob = new Blob(chunks, { type: "video/webm" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = "reaction.webm";
+          a.click();
+          stream.getTracks().forEach(track => track.stop());
+        };
+
+        recorder.start();
+        recorderRef.current = recorder;
+
+        // Stop after 12 seconds (duration of video)
+        setTimeout(() => recorder.stop(), 12000);
+      };
+
+      const handleRecordChoice = (answer) => {
+        if (answer === "yes") {
+          setShouldRecord(true);
+          startRecording();
+        }
+        setStep(3); // Move to animation
+      };
+
+      return (
+        <div className="App">
+          {step === 0 && <Welcome onContinue={() => setStep(1)} />}
+          {step === 1 && <Question onAnswer={(ans) => setStep(ans === "yes" ? 2 : 4)} />}
+          {step === 2 && <RecordPrompt onChoose={handleRecordChoice} />}
+          {step === 3 && <Cinematic onDone={() => setStep(5)} />}
+          {step === 4 && <Message />}
+          {step === 5 && <Reveal />}
+        </div>
+      );
+    }
+
+    const Welcome = ({ onContinue }) => (
+      <div className="screen welcome">
+        <h1 style={{ fontSize: "3rem", marginBottom: "30px" }}>hi Allie</h1>
+        <div className="button-group">
+          <button onClick={onContinue}>Enter</button>
+        </div>
+      </div>
+    );
+
+    const Question = ({ onAnswer }) => (
+      <div className="screen question">
+        <h2 style={{ fontSize: "2rem", marginBottom: "30px" }}>
+          Are you ready to find out what you're having?
+        </h2>
+        <div className="button-group">
+          <button onClick={() => onAnswer("no")}>No</button>
+          <button onClick={() => onAnswer("yes")}>Yes</button>
+        </div>
+      </div>
+    );
+
+    const RecordPrompt = ({ onChoose }) => (
+      <div className="screen">
+        <h2>Do you want to record your reaction?</h2>
+        <div className="button-group">
+          <button onClick={() => onChoose("yes")}>Yes, record me</button>
+          <button onClick={() => onChoose("no")}>No, just continue</button>
+        </div>
+      </div>
+    );
+
+    const Cinematic = ({ onDone }) => {
+      const videoRef = useRef();
+
+      useEffect(() => {
+        const vid = videoRef.current;
+        vid.play();
+        vid.onended = () => onDone();
+      }, []);
+
+      return (
+        <video ref={videoRef} className="fullscreen" muted playsInline>
+          <source src="baby.mp4" type="video/mp4" />
+          Your browser does not support the video tag.
+        </video>
+      );
+    };
+
+    const Reveal = () => (
+      <div className="reveal">
+        <h1>You're having a girl</h1>
+      </div>
+    );
+
+    const Message = () => (
+      <div className="screen">
+        <h2>Come back when you're ready.</h2>
+      </div>
+    );
+
+    ReactDOM.render(<App />, document.getElementById("root"));
+  </script>
+</body>
+</html>
